@@ -1,0 +1,327 @@
+import {
+  app,
+  BrowserWindow,
+  desktopCapturer,
+  dialog,
+  globalShortcut,
+  ipcMain,
+  IpcMainEvent,
+  IpcMainInvokeEvent,
+  shell,
+} from 'electron';
+// eslint-disable-next-line camelcase
+import * as child_process from 'child_process';
+import path from 'path';
+import fs from 'fs';
+import { join } from 'node:path';
+import {
+  CreateWindow,
+  ExecuteCmd,
+  GetSystemFilePath,
+  ResetShortKey,
+  SetShortKeys,
+  SysNotification,
+} from '../../common/constants';
+
+import { showNotification } from '../utils';
+import windowManger from '../window/windowManger';
+import { DBList, IWindowList } from '../../common/enum';
+import dbMap from '../data/db';
+import logger from '../utils/logger';
+import { INotification } from '../../common/types';
+
+// const clipboardEx = require('electron-clipboard-ex');
+
+export default {
+  listen() {
+    // 路由跳转
+    ipcMain.on(
+      'router',
+      (event: IpcMainEvent, arg: { window: IWindowList; hash: string }) => {
+        const window = windowManger.get(arg.window);
+        if (window) {
+          if (process.env.VITE_DEV_SERVER_URL) {
+            const winUrl = `http://localhost:${process.env.PORT}#/${arg.hash}`;
+
+            window.loadURL(winUrl);
+            window.webContents.openDevTools();
+          } else {
+            // TODO: check process.env.DIST!
+            window.loadFile(join(process.env.DIST!, 'index.html'), {
+              hash: `${arg.hash}`,
+            });
+          }
+        }
+      },
+    );
+
+    // 配置文件打开
+    const STORE_PATH = app.getPath('userData');
+    ipcMain.on('open-file', (event: IpcMainEvent, fileName: string) => {
+      logger.info(`STORE_PATH:${STORE_PATH}`);
+      const abFilePath = path.join(STORE_PATH, fileName);
+      if (fs.existsSync(abFilePath)) {
+        shell.openPath(abFilePath);
+      } else {
+        logger.info(`file not exists`);
+        fs.writeFileSync(abFilePath, '{}');
+        setTimeout(() => shell.openPath(abFilePath), 1000);
+      }
+    });
+
+    // 配置文件CRUD
+    ipcMain.handle(
+      'db-read',
+      (event: IpcMainInvokeEvent, args: { db: DBList; key: string }) => {
+        return dbMap?.get(args.db)?.read();
+      },
+    );
+    ipcMain.handle(
+      'db-get',
+      (event: IpcMainInvokeEvent, args: { db: DBList; key: string }) => {
+        const value = dbMap?.get(args.db)?.get(args.key);
+        logger.debug(
+          `[db-get] db:${args.db}, key:${args.key}, value: ${value}`,
+        );
+        return value;
+      },
+    );
+    ipcMain.on(
+      'db-set',
+      (
+        event: IpcMainEvent,
+        args: { db: DBList; key: string; value: string },
+      ) => {
+        dbMap?.get(args.db)?.set(args.key, args.value);
+      },
+    );
+    ipcMain.on(
+      'db-delete',
+      (event: IpcMainEvent, args: { db: DBList; key: string }) => {
+        dbMap?.get(args.db)?.remove(args.key);
+      },
+    );
+
+    // 监听Create_Window事件 -> 创建窗口
+    ipcMain.on(
+      CreateWindow,
+      (evt, arg: { window: IWindowList; hash: string }) => {
+        if (!windowManger.has(arg.window)) {
+          logger.info(`create: `, arg.window);
+          const window = windowManger.get(arg.window);
+          window?.show();
+        } else {
+          logger.info(`show: `, arg.window);
+          windowManger?.get(arg.window)?.show();
+        }
+      },
+    );
+
+    // main与renderer进程通信
+    ipcMain.handle('ping', async (event: IpcMainInvokeEvent, ...args) => {
+      logger.info(`[ipcMain.handle]arg: `, args);
+      // 处理异步调用请求
+      return { msg: '[ipcMain.handle]pong' };
+    });
+    ipcMain.on('ping', (event: IpcMainEvent, args) => {
+      logger.info(`[ipcMain.on]arg:`, args); // 打印接收到的消息
+      event.sender.send('ping-replay', { msg: '[event.sender.send]pong' });
+    });
+    // ipcMain.handle(GetClipBoardType, async () => {
+    //   const formats = clipboard.availableFormats();
+    //   if (formats.includes('text/plain') || formats.includes('text/html')) {
+    //     return [{ type: 'text', data: clipboard.readText() }]; // 剪贴板中包含文本数据
+    //   }
+    //
+    //   const paths: string[] = clipboardEx.readFilePaths();
+    //   const pathList: {
+    //     type: string;
+    //     data: PlatformPath;
+    //   }[] = [];
+    //
+    //   paths.map(async (p) => {
+    //     const isDir = await isDirectory(p);
+    //     pathList.push({ type: isDir ? 'directory' : 'file', data: path });
+    //   });
+    //
+    //   // paths.forEach(path => {
+    //   //     isDirectory(path).then(isDir => {
+    //   //         let fileType = getFileType(path);
+    //   //         dialog.showMessageBox({
+    //   //             title: '',
+    //   //             message: `path: ${path}, isDir: ${isDir}, hex: ${fileType.hex}, type:${fileType.type}`
+    //   //         })
+    //   //         // paths.push({type: fileType.type, path: path, isDir: isDir});
+    //   //     })
+    //   // })
+    //   return pathList;
+    // });
+
+    // 快捷键
+    ipcMain.on(
+      SetShortKeys,
+      (
+        event: IpcMainEvent,
+        args: {
+          new: string;
+          old: string;
+        },
+      ) => {
+        logger.info(`[ipcMain.on] old and new short key:`, args);
+        if (args.old) globalShortcut.unregister(args.old);
+        globalShortcut.register(args.new, () => {
+          // 调用截图方法
+          logger.info(`[globalShortcut.registered] ${args.new} is pressed`); // 如果新绑定的按键被按下，就会在terminal打印出来！
+        });
+      },
+    );
+    ipcMain.on(ResetShortKey, (event: IpcMainEvent, old) => {
+      logger.info(`old key:`, old);
+      globalShortcut.unregister(old);
+    });
+
+    // 选择文件夹
+    ipcMain.on(GetSystemFilePath, (event: IpcMainEvent, args) => {
+      logger.info(`[Get_System_File_Path] arg:`, args); // 打印接收到的消息
+
+      dialog
+        .showOpenDialog({
+          properties: ['openDirectory'],
+        })
+        .then((result) => {
+          logger.info(
+            `[ipcMain.on Get_System_File_Path]result`,
+            result,
+            ` result.filePaths: `,
+            result.filePaths,
+          );
+          if (!result.canceled) {
+            event.sender.send(GetSystemFilePath, {
+              path: result.filePaths[0],
+            });
+          }
+        })
+        .catch((err) => {
+          logger.info(err);
+          event.sender.send(GetSystemFilePath, { path: '' });
+        });
+    });
+
+    // 通知
+    ipcMain.on(
+      SysNotification,
+      (event: IpcMainEvent, options: INotification) => {
+        showNotification({
+          ...options,
+          // clickFn: () => logger.info(`notification clicked!/closed!`),
+        });
+      },
+    );
+
+    // curl -sL "https://api.github.com/repos/petgpt/petgpt/releases/latest" | find "tag_name" | for /F "delims=: tokens=2" %a in ('more') do @echo %~a
+
+    // 运行cmd
+    ipcMain.on(ExecuteCmd, (event: IpcMainEvent, cmd: string) => {
+      // const child = child_process.execFile;
+
+      // eslint-disable-next-line camelcase
+      const childProcess = child_process.exec(cmd);
+      // log
+      childProcess.stdout?.on('data', (data) => {
+        const version = data.trim();
+        logger.info(`${version.substring(1, version.length - 2)}`);
+      });
+
+      // child(args.executablePath, ['--incognito', '--window-size=800,600'], function(err, data) {
+      //     // dialog.showMessageBox({
+      //     //     // message: `err: ${err}, data: ${data}`
+      //     // })
+      // });
+    });
+
+    // 获取操作系统
+    ipcMain.handle('getOperatingSystem', () => {
+      return process.platform;
+    });
+
+    ipcMain.handle('getSources', async () => {
+      return desktopCapturer.getSources({ types: ['window', 'screen'] });
+    });
+
+    // 保存音频 => 选择路径
+    ipcMain.handle('showSaveDialog', async () => {
+      return dialog.showSaveDialog({
+        buttonLabel: 'Save video',
+        defaultPath: `vid-${Date.now()}.webm`,
+      });
+    });
+
+    // header的模拟关闭与最小化
+    ipcMain.on('close', () => {
+      BrowserWindow?.getFocusedWindow()?.close();
+    });
+    ipcMain.on('minus', () => {
+      BrowserWindow?.getFocusedWindow()?.minimize();
+    });
+
+    // 获取路由信息
+    ipcMain.handle('get-router-location', () => {
+      const window = BrowserWindow.getFocusedWindow();
+      return window?.webContents.getURL();
+    });
+
+    // pin current window
+    ipcMain.on('pinCurrentWindow', (event: IpcMainEvent, pin: boolean) => {
+      const window = BrowserWindow.getFocusedWindow();
+      if (window) {
+        window.setAlwaysOnTop(pin);
+      }
+    });
+
+    ipcMain.on('RELOAD_APP', () => {
+      app.relaunch();
+      app.exit(0);
+    });
+
+    // 创建保存文件对话框
+    ipcMain.on('saveImage', (event, imgUrl) => {
+      const options = {
+        title: 'Save Image',
+        defaultPath: app.getPath('downloads'),
+        filters: [{ name: 'Images', extensions: ['png'] }],
+      };
+
+      dialog
+        .showSaveDialog(BrowserWindow?.getFocusedWindow()!, options)
+        .then((result) => {
+          if (!result.canceled && result.filePath) {
+            const base64Data = imgUrl.replace(/^data:image\/png;base64,/, '');
+            fs.writeFile(result.filePath, base64Data, 'base64', (err) => {
+              if (err) {
+                console.error(err);
+              }
+            });
+          }
+        })
+        .catch((e) => {
+          throw e;
+        });
+    });
+
+    // ipcMain.on('logger', (event: IpcMainEvent, args: string) => {
+    //     logger.info(args)
+    // })
+
+    ipcMain.handle('platform', () => {
+      return process.platform;
+    });
+
+    ipcMain.handle('publicDir', () => {
+      return process.env.PUBLIC;
+    });
+
+    ipcMain.on('log', (event, args: any[]) => {
+      logger.info(args);
+    });
+  },
+};

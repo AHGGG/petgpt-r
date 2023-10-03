@@ -13,6 +13,13 @@ module.exports = {
     '@typescript-eslint/no-shadow': 'error',
     'no-unused-vars': 'off',
     '@typescript-eslint/no-unused-vars': 'error',
+    'react/button-has-type': 'off',
+    'no-nested-ternary': 'off', // 暂时关闭
+    'no-param-reassign': 'off', // 暂时关闭
+    'no-control-regex': 'off', // 暂时关闭
+    'class-methods-use-this': 'off', // 暂时关闭
+    'promise/always-return': 'off', // 暂时关闭
+    'promise/catch-or-return': 'off', // 暂时关闭
   },
   parserOptions: {
     ecmaVersion: 2022,

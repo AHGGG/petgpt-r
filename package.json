@@ -1,4 +1,7 @@
 {
+  "name": "petgpt-r",
+  "version": "0.0.3",
+  "main": "./src/main/main.ts",
   "description": "A foundation for scalable desktop apps",
   "keywords": [
     "electron",
@@ -32,7 +35,6 @@
       "url": "https://github.com/amilajack"
     }
   ],
-  "main": "./src/main/main.ts",
   "scripts": {
     "build": "concurrently \"npm run build:main\" \"npm run build:renderer\"",
     "build:dll": "cross-env NODE_ENV=development TS_NODE_TRANSPILE_ONLY=true webpack --config ./.erb/configs/webpack.config.renderer.dev.dll.ts",
@@ -96,12 +98,17 @@
     }
   },
   "dependencies": {
+    "@commonify/lowdb": "^3.0.0",
+    "ahooks": "^3.7.8",
+    "cross-spawn": "^7.0.3",
     "electron-debug": "^3.2.0",
     "electron-log": "^4.4.8",
     "electron-updater": "^6.1.4",
+    "lodash": "^4.17.21",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
-    "react-router-dom": "^6.16.0"
+    "react-router-dom": "^6.16.0",
+    "resolve": "^1.22.6"
   },
   "devDependencies": {
     "@electron/notarize": "^2.1.0",
@@ -111,11 +118,14 @@
     "@teamsupercell/typings-for-css-modules-loader": "^2.5.2",
     "@testing-library/jest-dom": "^6.1.3",
     "@testing-library/react": "^14.0.0",
+    "@types/cross-spawn": "^6.0.3",
     "@types/jest": "^29.5.5",
+    "@types/lodash": "^4.14.199",
     "@types/node": "20.6.2",
     "@types/react": "^18.2.21",
     "@types/react-dom": "^18.2.7",
     "@types/react-test-renderer": "^18.0.1",
+    "@types/resolve": "^1.20.3",
     "@types/terser-webpack-plugin": "^5.0.4",
     "@types/webpack-bundle-analyzer": "^4.6.0",
     "@typescript-eslint/eslint-plugin": "^6.7.0",
@@ -128,6 +138,7 @@
     "cross-env": "^7.0.3",
     "css-loader": "^6.8.1",
     "css-minimizer-webpack-plugin": "^5.0.1",
+    "daisyui": "^3.8.2",
     "detect-port": "^1.5.1",
     "electron": "^26.2.1",
     "electron-builder": "^24.6.4",
@@ -160,6 +171,7 @@
     "sass": "^1.67.0",
     "sass-loader": "^13.3.2",
     "style-loader": "^3.3.3",
+    "tailwind-scrollbar": "^3.0.4",
     "tailwindcss": "^3.3.3",
     "terser-webpack-plugin": "^5.3.9",
     "ts-jest": "^29.1.1",
@@ -175,8 +187,8 @@
     "webpack-merge": "^5.9.0"
   },
   "build": {
-    "productName": "ElectronReact",
-    "appId": "org.erb.ElectronReact",
+    "productName": "Petgpt-r",
+    "appId": "cn.ironpan.PetgptR",
     "asar": true,
     "asarUnpack": "**\\*.{node,dll}",
     "files": [
